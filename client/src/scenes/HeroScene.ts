@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { HeroSystem } from '../systems/HeroSystem';
 import { SaveManager } from '../utils/SaveManager';
 import { HEROES_DATA, HeroConfig } from '../data/heroes';
+import { getHeroSprite } from '../data/sprites';
 
 export class HeroScene extends Phaser.Scene {
   private heroSystem!: HeroSystem;
@@ -61,9 +62,25 @@ export class HeroScene extends Phaser.Scene {
       .setStrokeStyle(2, isActive ? 0xf0c040 : (isOwned ? 0x3a3a6a : 0x1a1a2a))
       .setInteractive({ useHandCursor: isOwned });
 
-    const cls = hero.heroClass.toLowerCase();
-    const key = this.textures.exists(`hero_${cls}`) ? `hero_${cls}` : 'hero_warrior';
-    this.add.image(x - w / 2 + 26, y, key).setDisplaySize(32, 48);
+    // Use tinyrpg animated sprite when available, otherwise placeholder image
+    const avatarX = x - w / 2 + 26;
+    const avatarY = y;
+    const spriteCfg = getHeroSprite(hero.heroClass);
+
+    if (spriteCfg && this.textures.exists(spriteCfg.defaultTextureKey)) {
+      const sprite = this.add.sprite(avatarX, avatarY, spriteCfg.defaultTextureKey)
+        .setDisplaySize(40, 52);
+      if (this.anims.exists(spriteCfg.idleAnimKey)) {
+        sprite.play(spriteCfg.idleAnimKey);
+      }
+      if (!isOwned) sprite.setTint(0x444444);
+    } else {
+      // Fallback to placeholder texture
+      const cls = hero.heroClass.toLowerCase();
+      const key = this.textures.exists(`hero_${cls}`) ? `hero_${cls}` : 'hero_warrior';
+      const img = this.add.image(avatarX, avatarY, key).setDisplaySize(32, 48);
+      if (!isOwned) img.setTint(0x444444);
+    }
 
     this.add.text(x - w / 2 + 56, y - 38, hero.name, {
       fontFamily: 'Courier New', fontSize: '13px',
@@ -86,7 +103,7 @@ export class HeroScene extends Phaser.Scene {
     });
 
     if (!isOwned) {
-      const unlock = this.add.text(x, y + 38, `🔒 Unlock: 💰${hero.unlockCost}`, {
+      this.add.text(x, y + 38, `🔒 Unlock: 💰${hero.unlockCost}`, {
         fontFamily: 'Courier New', fontSize: '10px', color: '#888888',
       }).setOrigin(0.5);
 

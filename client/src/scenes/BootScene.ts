@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TINY_SPRITES } from '../data/sprites';
 
 /**
  * BootScene – very first scene; creates placeholder graphics so the game
@@ -45,35 +46,88 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(0, 0, 32, 32);
     g.generateTexture('tile_water', 32, 32);
 
-    // ── Character placeholder (16×32) ───────────────────────────────────
+    // ── Tinyrpg character placeholders ───────────────────────────────────
+    // One placeholder sprite-sheet per character (single-frame, 96×64).
+    // These are used when the real PNG files have not been copied yet.
     const heroColors: Record<string, number> = {
+      Archer:   0x228b22,
+      Knight:   0x4169e1,
+      Mage:     0x9400d3,
+      Wizard:   0x8b008b,
+      Elf:      0x00ced1,
+      Cleric:   0xffd700,
+      Rogue:    0x2f4f4f,
+      Samurai:  0xb22222,
+    };
+    const enemyColors: Record<string, number> = {
+      Skeleton:   0xeeeeee,
+      Zombie:     0x6a9a3a,
+      Vampire:    0x8b0000,
+      Lich:       0xaaaaff,
+      Werewolf:   0x8b5e3c,
+      Goblin:     0x556b2f,
+      Orc:        0x8b4513,
+      Troll:      0x5f9ea0,
+      Golem:      0x708090,
+      Dragonling: 0xff6600,
+      Slime:      0x00ff7f,
+      Spider:     0x4b0082,
+      Boss:       0xff4500,
+    };
+
+    const allChars: Record<string, { color: number; role: 'hero' | 'enemy' }> = {};
+    for (const [name, color] of Object.entries(heroColors))  allChars[name] = { color, role: 'hero'  };
+    for (const [name, color] of Object.entries(enemyColors)) allChars[name] = { color, role: 'enemy' };
+
+    for (const [charName, { color, role }] of Object.entries(allChars)) {
+      const cfg   = TINY_SPRITES[charName];
+      if (!cfg) continue;
+
+      for (const sheet of cfg.sheets) {
+        // Build a minimal single-frame texture for every sheet so
+        // this.textures.exists(key) returns true even without real files.
+        const fw = sheet.frameWidth;
+        const fh = sheet.frameHeight;
+        g.clear();
+        // Body
+        g.fillStyle(color);
+        g.fillRect(fw * 0.25, fh * 0.25, fw * 0.5, fh * 0.65);
+        // Head
+        g.fillStyle(role === 'hero' ? 0xffe0b2 : 0x222222);
+        g.fillCircle(fw * 0.5, fh * 0.2, fh * 0.18);
+        // Border
+        g.lineStyle(1, 0xffffff, 0.2);
+        g.strokeRect(0, 0, fw, fh);
+        g.generateTexture(sheet.textureKey, fw, fh);
+      }
+    }
+
+    // ── Legacy single-frame hero/enemy keys (used by HeroScene fallback) ─
+    const legacyHeroColors: Record<string, number> = {
       warrior: 0x4169e1,
       mage:    0x9400d3,
       archer:  0x228b22,
       elf:     0x00ced1,
     };
-    for (const [cls, color] of Object.entries(heroColors)) {
+    for (const [cls, color] of Object.entries(legacyHeroColors)) {
       g.clear();
-      // body
       g.fillStyle(color);
       g.fillRect(4, 8, 8, 14);
-      // head
       g.fillStyle(0xffe0b2);
       g.fillCircle(8, 6, 5);
       g.generateTexture(`hero_${cls}`, 16, 32);
     }
 
-    // ── Enemy placeholder (16×32) ────────────────────────────────────────
-    const enemyColors: Record<string, number> = {
-      skeleton:  0xeeeeee,
-      zombie:    0x6a9a3a,
-      vampire:   0x8b0000,
-      lich:      0xaaaaff,
-      werewolf:  0x8b5e3c,
-      dragonling:0xff6600,
-      boss:      0xff4500,
+    const legacyEnemyColors: Record<string, number> = {
+      skeleton:   0xeeeeee,
+      zombie:     0x6a9a3a,
+      vampire:    0x8b0000,
+      lich:       0xaaaaff,
+      werewolf:   0x8b5e3c,
+      dragonling: 0xff6600,
+      boss:       0xff4500,
     };
-    for (const [type, color] of Object.entries(enemyColors)) {
+    for (const [type, color] of Object.entries(legacyEnemyColors)) {
       g.clear();
       g.fillStyle(color);
       g.fillRect(4, 8, 8, 14);

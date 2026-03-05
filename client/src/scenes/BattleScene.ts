@@ -4,6 +4,7 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { SaveManager } from '../utils/SaveManager';
 import { ENEMIES_DATA, EnemyConfig } from '../data/enemies';
 import { HeroSystem } from '../systems/HeroSystem';
+import { TINY_SPRITES, getHeroSprite, getEnemySprite } from '../data/sprites';
 
 const WAVE_DURATION = 30; // seconds per wave
 
@@ -15,7 +16,7 @@ export class BattleScene extends Phaser.Scene {
   private autoFightActive = true;
   private timerEvent!: Phaser.Time.TimerEvent;
   private enemyGroup!: Phaser.GameObjects.Group;
-  private heroSprites: Phaser.GameObjects.Image[] = [];
+  private heroSprites: Phaser.GameObjects.Sprite[] = [];
   private logLines: string[] = [];
   private logText!: Phaser.GameObjects.Text;
   private waveText!: Phaser.GameObjects.Text;
@@ -78,10 +79,11 @@ export class BattleScene extends Phaser.Scene {
     heroes.forEach((hero, i) => {
       const x = 60 + i * 60;
       const y = GAME_HEIGHT * 0.5;
-      const cls = hero.heroClass.toLowerCase();
-      const key = this.textures.exists(`hero_${cls}`) ? `hero_${cls}` : `hero_warrior`;
-      const img = this.add.image(x, y, key).setDisplaySize(32, 48).setDepth(5);
-      this.heroSprites.push(img);
+      const cls = hero.heroClass;
+
+      const sprite = this.createCharacterSprite(x, y, 'hero', cls);
+      sprite.setDepth(5);
+      this.heroSprites.push(sprite);
 
       // HP bar
       this.add.rectangle(x, y + 30, 40, 5, 0x333333).setDepth(6);
@@ -95,6 +97,38 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Create a Phaser.GameObjects.Sprite for the given character type.
+   * Uses the tinyrpg sprite sheet and plays the idle animation if loaded;
+   * otherwise falls back to a static image placeholder.
+   */
+  private createCharacterSprite(
+    x: number,
+    y: number,
+    role: 'hero' | 'enemy',
+    typeKey: string,
+  ): Phaser.GameObjects.Sprite {
+    const cfg = role === 'hero'
+      ? getHeroSprite(typeKey)
+      : getEnemySprite(typeKey.toLowerCase());
+
+    // Prefer real sprite sheet; fall back to placeholder texture
+    const textureKey = cfg && this.textures.exists(cfg.defaultTextureKey)
+      ? cfg.defaultTextureKey
+      : (role === 'hero'
+          ? `hero_${typeKey.toLowerCase()}`
+          : `enemy_${typeKey.toLowerCase()}`);
+
+    const sprite = this.add.sprite(x, y, textureKey).setDisplaySize(48, 64);
+
+    // Play idle animation if available
+    if (cfg && this.anims.exists(cfg.idleAnimKey)) {
+      sprite.play(cfg.idleAnimKey);
+    }
+
+    return sprite;
+  }
+
   // ── Wave spawning ────────────────────────────────────────────────────────
   private spawnWave() {
     if (this.enemyGroup) this.enemyGroup.clear(true, true);
@@ -105,11 +139,13 @@ export class BattleScene extends Phaser.Scene {
     enemies.forEach((enemy, i) => {
       const x = GAME_WIDTH - 60 - i * 55;
       const y = GAME_HEIGHT * 0.47;
-      const key = this.textures.exists(`enemy_${enemy.type}`) ? `enemy_${enemy.type}` : `enemy_skeleton`;
-      const img = this.add.image(x, y, key).setDisplaySize(28, 44).setDepth(5);
-      img.setData('enemy', enemy);
-      img.setData('idx', i);
-      this.enemyGroup.add(img);
+
+      const sprite = this.createCharacterSprite(x, y, 'enemy', enemy.type);
+      sprite.setFlipX(true); // face left toward heroes
+      sprite.setDepth(5);
+      sprite.setData('enemy', enemy);
+      sprite.setData('idx', i);
+      this.enemyGroup.add(sprite);
 
       // Enemy HP bar
       this.add.rectangle(x, y + 28, 36, 4, 0x333333).setDepth(6);
@@ -136,17 +172,40 @@ export class BattleScene extends Phaser.Scene {
     const result = this.combat.tick();
     result.log.forEach(l => this.log(l));
 
+    // Briefly play attack animation for each hero sprite
+    this.heroSprites.forEach((heroSprite, idx) => {
+      const hero = this.heroSystem.getActiveHeroes()[idx];
+      if (!hero) return;
+      const cfg = getHeroSprite(hero.heroClass);
+      if (!cfg) return;
+      const atkKey  = cfg.attackAnimKeys[0];
+      const idleKey = cfg.idleAnimKey;
+      if (atkKey && this.anims.exists(atkKey)) {
+        heroSprite.play(atkKey);
+        heroSprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+          if (this.anims.exists(idleKey)) heroSprite.play(idleKey);
+        });
+      }
+    });
+
     // Refresh enemy HP bars
     this.enemyGroup.getChildren().forEach((obj) => {
-      const img = obj as Phaser.GameObjects.Image;
-      const enemy = img.getData('enemy');
-      const idx = img.getData('idx');
+      const sprite = obj as Phaser.GameObjects.Sprite;
+      const enemy = sprite.getData('enemy');
+      const idx = sprite.getData('idx');
       if (!enemy || idx === undefined) return;
       const hpBar = this.children.getByName(`enemy_hpbar_${idx}`) as Phaser.GameObjects.Rectangle;
       if (hpBar) {
         const ratio = Math.max(0, enemy.hp / enemy.maxHp);
         hpBar.setSize(36 * ratio, 4);
-        if (enemy.hp <= 0) img.setAlpha(0.3);
+        if (enemy.hp <= 0) {
+          sprite.setAlpha(0.3);
+          // Play death animation if available
+          const eCfg = getEnemySprite(enemy.type);
+          if (eCfg && this.anims.exists(eCfg.deadAnimKey)) {
+            sprite.play(eCfg.deadAnimKey);
+          }
+        }
       }
     });
 
