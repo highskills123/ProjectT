@@ -6,11 +6,16 @@ import { SaveManager } from '../utils/SaveManager';
 import { BUILDINGS_DATA } from '../data/buildings';
 import type { BuildingConfig, PlacedBuilding } from '../data/buildings';
 
-const GRID_COLS = 7;
-const GRID_ROWS = 9;
+const GRID_COLS = 100;
+const GRID_ROWS = 100;
 const CELL = 64;
-const MAP_OFFSET_X = (GAME_WIDTH - GRID_COLS * CELL) / 2;
-const MAP_OFFSET_Y = 90;
+const MAP_OFFSET_X = 0;
+const TOP_BAR_HEIGHT = 44; // height of the top HUD bar in pixels
+const MAP_OFFSET_Y = TOP_BAR_HEIGHT;
+const MAP_W = MAP_OFFSET_X + GRID_COLS * CELL;
+const MAP_H = MAP_OFFSET_Y + GRID_ROWS * CELL;
+/** Pointer movement in pixels required to switch from a tap to a camera pan. */
+const CAMERA_PAN_THRESHOLD = 8;
 
 export class TownScene extends Phaser.Scene {
   private buildingSystem!: BuildingSystem;
@@ -30,6 +35,9 @@ export class TownScene extends Phaser.Scene {
     const save = SaveManager.load();
     this.buildingSystem = new BuildingSystem(save);
     this.idleSystem     = new IdleSystem(save, this.buildingSystem);
+
+    // Set world bounds for the large 100×100 grid map
+    this.cameras.main.setBounds(0, 0, MAP_W, MAP_H);
 
     this.drawBackground();
     this.drawGrid();
@@ -52,7 +60,7 @@ export class TownScene extends Phaser.Scene {
     // Bottom navigation
     this.createBottomNav();
 
-    // Highlight rect
+    // Highlight rect – stays in world space (scrolls with map)
     this.highlightRect = this.add.rectangle(0, 0, CELL, CELL, 0xffffff, 0.15)
       .setStrokeStyle(2, 0xffffff, 0.6)
       .setVisible(false)
@@ -61,17 +69,24 @@ export class TownScene extends Phaser.Scene {
 
   // ── Background ───────────────────────────────────────────────────────────
   private drawBackground() {
-    // Sky
+    // Sky strip above the grid (fixed to top of world)
     const sky = this.add.graphics();
     sky.fillGradientStyle(0x1a2a4a, 0x1a2a4a, 0x0a1525, 0x0a1525, 1);
-    sky.fillRect(0, 0, GAME_WIDTH, MAP_OFFSET_Y);
-    // Ground tiles
+    sky.fillRect(0, 0, MAP_W, MAP_OFFSET_Y);
+
+    // Ground – use a single Graphics object instead of 10 000 individual
+    // image objects so the large grid renders efficiently.
+    const ground = this.add.graphics();
+    // Base grass colour
+    ground.fillStyle(0x3a6b35);
+    ground.fillRect(MAP_OFFSET_X, MAP_OFFSET_Y, GRID_COLS * CELL, GRID_ROWS * CELL);
+    // Occasional dirt patches (same pattern as the previous tile logic)
+    ground.fillStyle(0x8b6914);
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
-        const x = MAP_OFFSET_X + c * CELL;
-        const y = MAP_OFFSET_Y + r * CELL;
-        const key = (r + c) % 5 === 0 ? 'tile_dirt' : 'tile_grass';
-        this.add.image(x + CELL / 2, y + CELL / 2, key);
+        if ((r + c) % 5 === 0) {
+          ground.fillRect(MAP_OFFSET_X + c * CELL, MAP_OFFSET_Y + r * CELL, CELL, CELL);
+        }
       }
     }
   }
@@ -161,6 +176,9 @@ export class TownScene extends Phaser.Scene {
       this.createBuildCard(cx, cy, type, cfg);
       idx++;
     }
+
+    // Pin the build panel to the screen (no camera scroll)
+    this.buildPanel.setScrollFactor(0);
   }
 
   private createBuildCard(x: number, y: number, type: string, cfg: BuildingConfig) {
@@ -223,10 +241,37 @@ export class TownScene extends Phaser.Scene {
 
   // ── Grid input ───────────────────────────────────────────────────────────
   private setupGridInput() {
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let isDragging = false;
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.buildPanelVisible) return;
-      const col = Math.floor((pointer.x - MAP_OFFSET_X) / CELL);
-      const row = Math.floor((pointer.y - MAP_OFFSET_Y) / CELL);
+      dragStartX = pointer.x;
+      dragStartY = pointer.y;
+      isDragging = false;
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.isDown) return;
+      const dx = Math.abs(pointer.x - dragStartX);
+      const dy = Math.abs(pointer.y - dragStartY);
+      if (dx > CAMERA_PAN_THRESHOLD || dy > CAMERA_PAN_THRESHOLD) {
+        isDragging = true;
+        // Use frame-delta for smooth 1:1 finger-tracking instead of velocity
+        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x);
+        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y);
+      }
+    });
+
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (isDragging || this.buildPanelVisible) return;
+
+      // Convert screen coordinates to world coordinates
+      const worldX = pointer.x + this.cameras.main.scrollX;
+      const worldY = pointer.y + this.cameras.main.scrollY;
+
+      const col = Math.floor((worldX - MAP_OFFSET_X) / CELL);
+      const row = Math.floor((worldY - MAP_OFFSET_Y) / CELL);
       if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return;
 
       this.selectedCell = { col, row };
@@ -248,6 +293,8 @@ export class TownScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
     const container = this.add.container(cx, cy).setName('binfo-overlay').setDepth(30);
+    // Pin the popup to the screen, not the world
+    container.setScrollFactor(0);
 
     const bg = this.add.rectangle(0, 0, 280, 200, 0x0d0d25, 0.97)
       .setStrokeStyle(2, 0x5a5aaa);
@@ -325,6 +372,9 @@ export class TownScene extends Phaser.Scene {
         if (txt) txt.setText(String(Math.floor(save.resources[res] ?? 0)));
       });
     });
+
+    // Pin the top bar to the screen (no camera scroll)
+    bar.setScrollFactor(0);
   }
 
   // ── Bottom nav ───────────────────────────────────────────────────────────
@@ -340,7 +390,8 @@ export class TownScene extends Phaser.Scene {
     const navH = 58;
     const y = GAME_HEIGHT - navH / 2;
     const bg = this.add.rectangle(GAME_WIDTH / 2, y, GAME_WIDTH, navH, 0x06060f, 0.95)
-      .setDepth(15).setStrokeStyle(1, 0x2a2a5a);
+      .setDepth(15).setStrokeStyle(1, 0x2a2a5a)
+      .setScrollFactor(0);
 
     const w = GAME_WIDTH / navItems.length;
     navItems.forEach((item, i) => {
@@ -350,7 +401,8 @@ export class TownScene extends Phaser.Scene {
         fontSize: '11px',
         color: item.scene === 'TownScene' ? '#f0c040' : '#8888bb',
         align: 'center',
-      }).setOrigin(0.5).setDepth(16).setInteractive({ useHandCursor: true });
+      }).setOrigin(0.5).setDepth(16).setInteractive({ useHandCursor: true })
+        .setScrollFactor(0);
 
       btn.on('pointerdown', () => {
         if (item.scene !== 'TownScene') {
@@ -368,7 +420,7 @@ export class TownScene extends Phaser.Scene {
       color: '#ff9999',
       backgroundColor: '#00000099',
       padding: { x: 10, y: 6 },
-    }).setOrigin(0.5).setDepth(50);
+    }).setOrigin(0.5).setDepth(50).setScrollFactor(0);
 
     this.tweens.add({
       targets: toast,
