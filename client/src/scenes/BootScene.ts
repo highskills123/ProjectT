@@ -56,6 +56,7 @@ export class BootScene extends Phaser.Scene {
       Wizard:   0x8b008b,
       Elf:      0x00ced1,
       Cleric:   0xffd700,
+      Priest:   0xf0e68c,
       Rogue:    0x2f4f4f,
       Samurai:  0xb22222,
     };

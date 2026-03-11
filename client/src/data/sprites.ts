@@ -156,6 +156,33 @@ function attackSheet(
   };
 }
 
+// ── Helper: build a single-row animation sheet SheetDef ───────────────────────
+/**
+ * Creates a SheetDef for a dedicated single-row PNG file.
+ * File path convention: sprites/tiny/<CharName>/<CharName>-<fileSuffix>.png
+ */
+function singleRowSheet(
+  charName: string,
+  fileSuffix: string,
+  textureKey: string,
+  animKey: string,
+  frameCount: number,
+  frameRate: number,
+  repeat: number,
+  frameWidth = W,
+  frameHeight = H,
+): SheetDef {
+  return {
+    path:        `sprites/tiny/${charName}/${charName}-${fileSuffix}.png`,
+    textureKey,
+    frameWidth,
+    frameHeight,
+    animations: [
+      { key: animKey, row: 0, frameCount, frameRate, repeat },
+    ],
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CHARACTER DEFINITIONS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,16 +242,25 @@ export const TINY_SPRITES: Record<string, TinySpriteConfig> = {
   Wizard: {
     name: 'Wizard',
     role: 'hero',
-    defaultTextureKey: 'wizard_sheet',
-    idleAnimKey:    'wizard_sheet_idle',
-    walkAnimKey:    'wizard_sheet_walk',
+    defaultTextureKey: 'wizard_idle',
+    idleAnimKey:    'wizard_idle_anim',
+    walkAnimKey:    'wizard_walk_anim',
     attackAnimKeys: ['wizard_atk1_anim', 'wizard_atk2_anim'],
-    hurtAnimKey:    'wizard_sheet_hurt',
-    deadAnimKey:    'wizard_sheet_dead',
+    hurtAnimKey:    'wizard_hurt_anim',
+    deadAnimKey:    'wizard_dead_anim',
     sheets: [
-      combinedSheet('Wizard', 'wizard_sheet'),
-      attackSheet('Wizard', 1, 'wizard_atk1', 'wizard_atk1_anim', 6),
-      attackSheet('Wizard', 2, 'wizard_atk2', 'wizard_atk2_anim', 6),
+      // Individual animation sheets (100×100 frames) – named exactly as uploaded
+      singleRowSheet('Wizard', 'Idle',            'wizard_idle',        'wizard_idle_anim',          6,  8, -1, 100, 100),
+      singleRowSheet('Wizard', 'Walk',            'wizard_walk',        'wizard_walk_anim',          8, 10, -1, 100, 100),
+      singleRowSheet('Wizard', 'Attack01',        'wizard_atk1',        'wizard_atk1_anim',          6, 12,  0, 100, 100),
+      singleRowSheet('Wizard', 'Attack02',        'wizard_atk2',        'wizard_atk2_anim',          6, 12,  0, 100, 100),
+      singleRowSheet('Wizard', 'Hurt',            'wizard_hurt',        'wizard_hurt_anim',          4, 10,  0, 100, 100),
+      singleRowSheet('Wizard', 'DEATH',           'wizard_dead',        'wizard_dead_anim',          4,  8,  0, 100, 100),
+      // Effect and shadow sheets
+      singleRowSheet('Wizard', 'Attack01_Effect', 'wizard_atk1_effect', 'wizard_atk1_effect_anim',  10, 12,  0, 100, 100),
+      singleRowSheet('Wizard', 'Attack02_Effect', 'wizard_atk2_effect', 'wizard_atk2_effect_anim',   7, 12,  0, 100, 100),
+      singleRowSheet('Wizard', 'Shadow',          'wizard_shadow',      'wizard_shadow_anim',         1,  8, -1, 100, 100),
+      singleRowSheet('Wizard', 'Shadow_death',    'wizard_shadow_dead', 'wizard_shadow_dead_anim',   4,  8,  0, 100, 100),
     ],
   },
 
@@ -273,6 +309,30 @@ export const TINY_SPRITES: Record<string, TinySpriteConfig> = {
       combinedSheet('Rogue', 'rogue_sheet'),
       attackSheet('Rogue', 1, 'rogue_atk1', 'rogue_atk1_anim', 6),
       attackSheet('Rogue', 2, 'rogue_atk2', 'rogue_atk2_anim', 6),
+    ],
+  },
+
+  /**
+   * Priest – currently only spell-effect sheets are available
+   * (Attack_effect and Heal_Effect).  Full character sheets
+   * (Idle, Walk, Attack, Hurt, Death) should be added to
+   * client/assets/sprites/tiny/Priest/ once they are exported from
+   * Priest.aseprite.  Until then all state keys fall back to the attack
+   * effect animation so the character is at least visible in battle.
+   */
+  Priest: {
+    name: 'Priest',
+    role: 'hero',
+    defaultTextureKey: 'priest_atk_effect',
+    idleAnimKey:    'priest_atk_effect_anim',   // fallback – no idle sheet yet
+    walkAnimKey:    'priest_atk_effect_anim',   // fallback – no walk sheet yet
+    attackAnimKeys: ['priest_atk_effect_anim'],
+    hurtAnimKey:    'priest_atk_effect_anim',   // fallback – no hurt sheet yet
+    deadAnimKey:    'priest_heal_effect_anim',  // use heal effect as death anim for now
+    sheets: [
+      // Effect sheets (100×100 frames) – named exactly as uploaded
+      singleRowSheet('Priest', 'Attack_effect', 'priest_atk_effect',  'priest_atk_effect_anim',  5, 12, 0, 100, 100),
+      singleRowSheet('Priest', 'Heal_Effect',   'priest_heal_effect', 'priest_heal_effect_anim', 4,  8, 0, 100, 100),
     ],
   },
 
@@ -390,16 +450,26 @@ export const TINY_SPRITES: Record<string, TinySpriteConfig> = {
   Orc: {
     name: 'Orc',
     role: 'enemy',
-    defaultTextureKey: 'orc_sheet',
-    idleAnimKey:    'orc_sheet_idle',
-    walkAnimKey:    'orc_sheet_walk',
+    defaultTextureKey: 'orc_idle',
+    idleAnimKey:    'orc_idle_anim',
+    walkAnimKey:    'orc_walk_anim',
     attackAnimKeys: ['orc_atk1_anim', 'orc_atk2_anim'],
-    hurtAnimKey:    'orc_sheet_hurt',
-    deadAnimKey:    'orc_sheet_dead',
+    hurtAnimKey:    'orc_hurt_anim',
+    deadAnimKey:    'orc_dead_anim',
     sheets: [
-      combinedSheet('Orc', 'orc_sheet'),
-      attackSheet('Orc', 1, 'orc_atk1', 'orc_atk1_anim', 6),
-      attackSheet('Orc', 2, 'orc_atk2', 'orc_atk2_anim', 6),
+      // Individual animation sheets (100×100 frames) – named exactly as uploaded
+      singleRowSheet('Orc', 'Idle',            'orc_idle',        'orc_idle_anim',          6,  8, -1, 100, 100),
+      singleRowSheet('Orc', 'Walk',            'orc_walk',        'orc_walk_anim',          8, 10, -1, 100, 100),
+      singleRowSheet('Orc', 'Attack01',        'orc_atk1',        'orc_atk1_anim',          6, 12,  0, 100, 100),
+      singleRowSheet('Orc', 'Attack02',        'orc_atk2',        'orc_atk2_anim',          6, 12,  0, 100, 100),
+      singleRowSheet('Orc', 'Hurt',            'orc_hurt',        'orc_hurt_anim',          4, 10,  0, 100, 100),
+      singleRowSheet('Orc', 'Death',           'orc_dead',        'orc_dead_anim',          4,  8,  0, 100, 100),
+      // Effect and shadow sheets
+      singleRowSheet('Orc', 'attack01_Effect', 'orc_atk1_effect', 'orc_atk1_effect_anim',   6, 12,  0, 100, 100),
+      singleRowSheet('Orc', 'attack02_Effect', 'orc_atk2_effect', 'orc_atk2_effect_anim',   6, 12,  0, 100, 100),
+      singleRowSheet('Orc', 'shadow',          'orc_shadow',      'orc_shadow_anim',         1,  8, -1, 100, 100),
+      singleRowSheet('Orc', 'shadow_attack02', 'orc_shadow_atk2', 'orc_shadow_atk2_anim',   6, 12,  0, 100, 100),
+      singleRowSheet('Orc', 'shadow_death',    'orc_shadow_dead', 'orc_shadow_dead_anim',   4,  8,  0, 100, 100),
     ],
   },
 
