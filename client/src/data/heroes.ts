@@ -1,3 +1,5 @@
+import { HERO_CLASS_TO_SPRITE } from './sprites';
+
 export interface HeroConfig {
   className: string;
   description: string;
@@ -11,6 +13,11 @@ export interface HeroConfig {
   skills: HeroSkill[];
   role: 'tank' | 'dps' | 'support' | 'mage' | 'ranged';
   element: 'fire' | 'ice' | 'lightning' | 'dark' | 'light' | 'nature';
+  /**
+   * Key into TINY_SPRITES (e.g. 'Knight').
+   * Resolved from HERO_CLASS_TO_SPRITE in data/sprites.ts.
+   */
+  spriteKey: string;
 }
 
 export interface HeroSkill {
@@ -29,6 +36,7 @@ export const HEROES_DATA: Record<string, HeroConfig> = {
     description: 'A heavily armoured melee warrior inspired by Mu Online\'s Dark Knight. Excels in defence and dealing consistent damage.',
     role: 'tank',
     element: 'dark',
+    spriteKey: HERO_CLASS_TO_SPRITE['WARRIOR'],
     statGrowth: { hp: 120, attack: 8, defense: 12, speed: 3 },
     skills: [
       { id: 'slash',       name: 'Power Slash',    description: 'Deals 150% ATK to one enemy.',          cooldown: 3, damageMultiplier: 1.5 },
@@ -42,6 +50,7 @@ export const HEROES_DATA: Record<string, HeroConfig> = {
     description: 'A powerful spellcaster inspired by Mu Online\'s Dark Wizard. Glass cannon with devastating area spells.',
     role: 'mage',
     element: 'lightning',
+    spriteKey: HERO_CLASS_TO_SPRITE['MAGE'],
     statGrowth: { hp: 60, attack: 18, defense: 4, speed: 6 },
     skills: [
       { id: 'fireball',    name: 'Meteor Strike',  description: 'Deals 200% ATK to all enemies.',         cooldown: 5, damageMultiplier: 2.0 },
@@ -55,6 +64,7 @@ export const HEROES_DATA: Record<string, HeroConfig> = {
     description: 'A swift ranged attacker inspired by Mu Online\'s Fairy Elf. High speed and critical rate.',
     role: 'ranged',
     element: 'nature',
+    spriteKey: HERO_CLASS_TO_SPRITE['ARCHER'],
     statGrowth: { hp: 75, attack: 14, defense: 6, speed: 10 },
     skills: [
       { id: 'multishot',   name: 'Multi-Shot',     description: 'Fires 3 arrows, each dealing 70% ATK.',  cooldown: 4, damageMultiplier: 0.7 },
@@ -68,6 +78,7 @@ export const HEROES_DATA: Record<string, HeroConfig> = {
     description: 'A support hero who summons creatures and buffs allies. Inspired by Call of Dragons companion system.',
     role: 'support',
     element: 'light',
+    spriteKey: HERO_CLASS_TO_SPRITE['ELF'],
     statGrowth: { hp: 80, attack: 10, defense: 8, speed: 7 },
     skills: [
       { id: 'summon',      name: 'Summon Beast',   description: 'Summons a creature to fight for 5 turns.',cooldown: 8 },
